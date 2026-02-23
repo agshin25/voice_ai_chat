@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/user/Documents/Projects/voice-ai-chat/frontend && npm run build 2>&1)",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
