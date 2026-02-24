@@ -10,7 +10,7 @@ def transcribe(audio_path: str) -> str:
     with open(audio_path, "rb") as audio_file:
         transcription = client.audio.transcriptions.create(
             model="whisper-1",
-            file=audio_file,
+            file=("audio.webm", audio_file, "audio/webm"),
             prompt="Salam, necəsən? Mənə Azərbaycan haqqında məlumat ver. Yaxşıyam, sağ ol. Hello, how are you? Merhaba, nasılsın?",
         )
     return transcription.text
