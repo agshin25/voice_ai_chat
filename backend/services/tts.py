@@ -7,30 +7,49 @@ VOICES = {
     "ru": "ru-RU-SvetlanaNeural",
     "de": "de-DE-KatjaNeural",
     "fr": "fr-FR-DeniseNeural",
+    "es": "es-ES-ElviraNeural",
+    "ar": "ar-SA-ZariyahNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "ja": "ja-JP-NanamiNeural",
+    "ko": "ko-KR-SunHiNeural",
 }
 
 def detect_language(text: str) -> str:
-    az_words = ["salam", "necə", "yaxşı", "təşəkkür", "xoş", "edirəm", "ə", "ı", "ö", "ü", "ç", "ş", "ğ"]
-    tr_words = ["merhaba", "nasıl", "teşekkür", "evet", "hayır", "güzel", "değil"]
-    
     text_lower = text.lower()
     
-    if any(c in text_lower for c in ["ə", "ğ"]):
+    # Azerbaijani-specific characters
+    if "ə" in text_lower or "ğ" in text_lower:
         return "az"
     
-    az_score = sum(1 for w in az_words if w in text_lower)
-    tr_score = sum(1 for w in tr_words if w in text_lower)
-    
-    if az_score > tr_score:
-        return "az"
-    if tr_score > az_score:
+    # Turkish-specific patterns
+    if any(w in text_lower for w in ["merhaba", "nasılsın", "teşekkür", "değil", "güzel"]):
         return "tr"
     
-    ascii_ratio = sum(1 for c in text if c.isascii()) / max(len(text), 1)
-    if ascii_ratio > 0.9:
-        return "en"
+    # Russian
+    if any("\u0400" <= c <= "\u04ff" for c in text):
+        return "ru"
     
-    return "az"
+    # Chinese
+    if any("\u4e00" <= c <= "\u9fff" for c in text):
+        return "zh"
+    
+    # Japanese
+    if any("\u3040" <= c <= "\u30ff" for c in text):
+        return "ja"
+    
+    # Korean
+    if any("\uac00" <= c <= "\ud7af" for c in text):
+        return "ko"
+    
+    # Arabic
+    if any("\u0600" <= c <= "\u06ff" for c in text):
+        return "ar"
+    
+    # Check for Turkish without special chars
+    if any(c in text_lower for c in ["ı", "ö", "ü", "ç", "ş"]) and "ə" not in text_lower:
+        return "tr"
+    
+    return "en"
 
 async def text_to_speech(text: str, output_path: str, voice: str = None):
     if voice is None:
