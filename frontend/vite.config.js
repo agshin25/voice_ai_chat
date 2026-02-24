@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': 'https://sublunated-predominately-kyleigh.ngrok-free.dev',
+      '/api': 'http://localhost:8001',
+      // '/api': 'http://localhost:8001',
+
     },
-    allowedHosts: 'all'
   },
 })
