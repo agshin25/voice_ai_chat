@@ -25,8 +25,7 @@ async def chat(audio: UploadFile = File(...)):
     temp_input.write(await audio.read())
     temp_input.close()
 
-    raw_text = transcribe(temp_input.name)
-    user_text = clean_transcription(raw_text)
+    user_text = transcribe(temp_input.name)
     os.unlink(temp_input.name)
 
     ai_text = get_response(user_text, chat_history)

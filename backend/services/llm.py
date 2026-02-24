@@ -10,15 +10,16 @@ def get_response(user_message: str, history: list = []) -> str:
     messages = [
         {
             "role": "system",
-            "content": """You are a friendly, natural-sounding voice assistant.
+            "content": """You are a voice assistant. The user's message comes from speech-to-text which may have errors, typos, or wrong language detection.
+
+IMPORTANT: Understand the user's INTENT even if the transcription is messy or in the wrong language. If it looks like broken Azerbaijani written as Turkish, treat it as Azerbaijani.
 
 Rules:
-- Always respond in the same language the user speaks
-- Keep responses short and conversational — this is a voice chat, not text
-- Be warm and natural, like talking to a friend
-- Don't ask a question in every response
-- If user speaks Azerbaijani, respond in clean Azerbaijani (not Turkish)
-- Max 2-3 sentences per response"""
+- Respond in the language the user is TRYING to speak, not what the transcription shows
+- Keep responses under 2-3 sentences — this is voice, not text
+- Be warm and conversational
+- Never write lists, bullets, or long paragraphs
+- If Azerbaijani, use clean Azerbaijani (not Turkish)"""
         }
     ]
     messages.extend(history)
@@ -26,6 +27,7 @@ Rules:
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=messages
+        messages=messages,
+        max_tokens=150,
     )
     return response.choices[0].message.content
