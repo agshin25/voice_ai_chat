@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import tempfile
 import os
 
-from services.stt import transcribe, clean_transcription
+from services.stt import transcribe
 from services.llm import get_response
 from services.tts import text_to_speech
 
