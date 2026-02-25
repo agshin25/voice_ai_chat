@@ -11,6 +11,7 @@ export default function useVoiceChat() {
 
   const audioRef = useRef(null)
   const statusRef = useRef('idle')
+  const timeoutRef = useRef(null)
   const ws = useWebSocket()
   const vad = useVAD()
 
@@ -23,6 +24,24 @@ export default function useVoiceChat() {
   }, [error])
 
   /* ── Helpers ── */
+
+  const clearProcessingTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [])
+
+  const startProcessingTimeout = useCallback(() => {
+    clearProcessingTimeout()
+    timeoutRef.current = setTimeout(() => {
+      if (statusRef.current === 'processing') {
+        console.warn('Processing timeout — resuming listening')
+        setStatus('listening')
+        vad.resume()
+      }
+    }, 30000)
+  }, [clearProcessingTimeout, vad])
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -39,6 +58,7 @@ export default function useVoiceChat() {
         switch (data.status) {
           case 'transcribing':
             setStatus('processing')
+            startProcessingTimeout()
             break
 
           case 'thinking':
@@ -55,17 +75,23 @@ export default function useVoiceChat() {
             ])
             break
 
+          case 'error':
+            console.error('Server error:', data.message)
+            setError('Something went wrong. Try again.')
+            break
+
           case 'idle':
-            // Server done — resume listening if not playing audio
+            clearProcessingTimeout()
             if (statusRef.current !== 'playing') {
               setStatus('listening')
+              vad.resume()
             }
             break
         }
       },
 
       onBinary: async (data) => {
-        // Pause VAD so it doesn't pick up AI audio from speakers
+        clearProcessingTimeout()
         vad.pause()
         setStatus('playing')
 
@@ -77,7 +103,7 @@ export default function useVoiceChat() {
           URL.revokeObjectURL(url)
           if (audioRef.current === audio) {
             audioRef.current = null
-            if (statusRef.current === 'playing') {
+            if (statusRef.current !== 'idle') {
               setStatus('listening')
               vad.resume()
             }
@@ -92,10 +118,11 @@ export default function useVoiceChat() {
       },
 
       onClose: () => {
+        clearProcessingTimeout()
         if (statusRef.current !== 'idle') setStatus('idle')
       },
     })
-  }, [ws, vad, stopAudio])
+  }, [ws, vad, stopAudio, startProcessingTimeout, clearProcessingTimeout])
 
   /* ── Start / End conversation ── */
 
@@ -125,11 +152,12 @@ export default function useVoiceChat() {
   }, [ws, vad, setupWSHandlers, stopAudio])
 
   const endConversation = useCallback(() => {
+    clearProcessingTimeout()
     stopAudio()
     vad.stop()
     ws.disconnect()
     setStatus('idle')
-  }, [ws, vad, stopAudio])
+  }, [ws, vad, stopAudio, clearProcessingTimeout])
 
   const toggle = useCallback(() => {
     if (status === 'idle') startConversation()
