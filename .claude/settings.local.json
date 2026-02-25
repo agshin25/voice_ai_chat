@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/user/Desktop/Temporary/voice_ai_chat/frontend && npm install @ricky0123/vad-web 2>&1)",
+      "Bash(ls:*)",
+      "Bash(cd /c/Users/user/Desktop/Temporary/voice_ai_chat/frontend && node -e \"console.log\\(require\\('onnxruntime-web/package.json'\\).version\\)\" 2>&1 && node -e \"console.log\\(require\\('@ricky0123/vad-web/package.json'\\).version\\)\" 2>&1)"
     ]
   }
 }
