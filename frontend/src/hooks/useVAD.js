@@ -10,6 +10,13 @@ export default function useVAD() {
       workletURL: '/vad.worklet.bundle.min.js',
       modelURL: '/silero_vad.onnx',
       onnxWASMBasePath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.2/dist/',
+      getStream: () => navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      }),
       positiveSpeechThreshold: 0.8,
       negativeSpeechThreshold: 0.35,
       minSpeechFrames: 5,

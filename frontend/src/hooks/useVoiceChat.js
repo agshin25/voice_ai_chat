@@ -65,7 +65,8 @@ export default function useVoiceChat() {
       },
 
       onBinary: async (data) => {
-        // AI TTS audio received
+        // Pause VAD so it doesn't pick up AI audio from speakers
+        vad.pause()
         setStatus('playing')
 
         const url = createAudioURL(data)
@@ -78,6 +79,7 @@ export default function useVoiceChat() {
             audioRef.current = null
             if (statusRef.current === 'playing') {
               setStatus('listening')
+              vad.resume()
             }
           }
         }
@@ -93,7 +95,7 @@ export default function useVoiceChat() {
         if (statusRef.current !== 'idle') setStatus('idle')
       },
     })
-  }, [ws, stopAudio])
+  }, [ws, vad, stopAudio])
 
   /* ── Start / End conversation ── */
 
@@ -105,8 +107,6 @@ export default function useVoiceChat() {
 
       await vad.start({
         onSpeechStart: () => {
-          // Barge-in: if AI is playing, stop it
-          stopAudio()
           setStatus('recording')
         },
         onSpeechEnd: (audio) => {

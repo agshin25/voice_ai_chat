@@ -1,14 +1,15 @@
-import os
-from dotenv import load_dotenv
-from groq import Groq
-load_dotenv()
+from faster_whisper import WhisperModel
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 
 def transcribe(audio_path: str) -> str:
-    with open(audio_path, "rb") as audio_file:
-        transcription = client.audio.transcriptions.create(
-            model="whisper-large-v3",
-            file=audio_file,
-        )
-    return transcription.text
+    segments, info = model.transcribe(
+        audio_path,
+        beam_size=5,
+        best_of=5,
+        temperature=0.0,
+        initial_prompt="Salam, necəsən? Mənə Azərbaycan haqqında məlumat ver. Yaxşıyam, sağ ol.",
+        vad_filter=True,
+    )
+    text = " ".join([segment.text for segment in segments])
+    return text.strip()
