@@ -10,6 +10,11 @@ export default function useVoiceChat() {
   const [error, setError] = useState(null)
 
   const audioRef = useRef(null)
+  const audioQueueRef = useRef([])
+  const isPlayingRef = useRef(false)
+  const idleReceivedRef = useRef(false)
+  const streamingTextRef = useRef("")
+  const aiMessageIdRef = useRef(null)
   const statusRef = useRef('idle')
   const timeoutRef = useRef(null)
   const ws = useWebSocket()
@@ -46,7 +51,38 @@ export default function useVoiceChat() {
     }, 15000)
   }, [clearProcessingTimeout, vad])
 
+  const playNext = useCallback(() => {
+    const queue = audioQueueRef.current
+    if (queue.length === 0) {
+      isPlayingRef.current = false
+      // If server already sent idle, resume listening now
+      if (idleReceivedRef.current) {
+        updateStatus('listening')
+        vad.resume()
+      }
+      return
+    }
+
+    isPlayingRef.current = true
+    const data = queue.shift()
+    const url = createAudioURL(data)
+    const audio = new Audio(url)
+    audioRef.current = audio
+
+    const onDone = () => {
+      URL.revokeObjectURL(url)
+      audioRef.current = null
+      playNext()
+    }
+
+    audio.onended = onDone
+    audio.onerror = onDone
+    audio.play().catch(onDone)
+  }, [vad, updateStatus])
+
   const stopAudio = useCallback(() => {
+    audioQueueRef.current = []
+    isPlayingRef.current = false
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
@@ -65,17 +101,48 @@ export default function useVoiceChat() {
             break
 
           case 'thinking':
+            // Reset streaming state for new response
+            streamingTextRef.current = ""
+            aiMessageIdRef.current = null
+            idleReceivedRef.current = false
             setMessages((prev) => [
               ...prev,
               { id: crypto.randomUUID(), role: 'user', text: data.user_text },
             ])
             break
 
+          case 'ai_chunk': {
+            // Accumulate streaming text
+            const chunk = data.text
+            streamingTextRef.current += (streamingTextRef.current ? " " : "") + chunk
+
+            if (!aiMessageIdRef.current) {
+              // First chunk — create the AI message
+              const id = crypto.randomUUID()
+              aiMessageIdRef.current = id
+              setMessages((prev) => [
+                ...prev,
+                { id, role: 'ai', text: streamingTextRef.current },
+              ])
+            } else {
+              // Update existing AI message with accumulated text
+              const id = aiMessageIdRef.current
+              const text = streamingTextRef.current
+              setMessages((prev) =>
+                prev.map((m) => (m.id === id ? { ...m, text } : m))
+              )
+            }
+            break
+          }
+
           case 'speaking':
-            setMessages((prev) => [
-              ...prev,
-              { id: crypto.randomUUID(), role: 'ai', text: data.ai_text },
-            ])
+            // Final complete text — update the AI message to ensure it's complete
+            if (aiMessageIdRef.current) {
+              const id = aiMessageIdRef.current
+              setMessages((prev) =>
+                prev.map((m) => (m.id === id ? { ...m, text: data.ai_text } : m))
+              )
+            }
             break
 
           case 'error':
@@ -85,7 +152,9 @@ export default function useVoiceChat() {
 
           case 'idle':
             clearProcessingTimeout()
-            if (statusRef.current !== 'playing') {
+            idleReceivedRef.current = true
+            // Only resume if nothing is playing
+            if (!isPlayingRef.current) {
               updateStatus('listening')
               vad.resume()
             }
@@ -93,31 +162,17 @@ export default function useVoiceChat() {
         }
       },
 
-      onBinary: async (data) => {
+      onBinary: (data) => {
         clearProcessingTimeout()
         vad.pause()
         updateStatus('playing')
 
-        const url = createAudioURL(data)
-        const audio = new Audio(url)
-        audioRef.current = audio
-
-        const cleanup = () => {
-          URL.revokeObjectURL(url)
-          if (audioRef.current === audio) {
-            audioRef.current = null
-            if (statusRef.current !== 'idle') {
-              updateStatus('listening')
-              vad.resume()
-            }
-          }
+        // Queue the audio chunk
+        audioQueueRef.current.push(data)
+        // If nothing is currently playing, start playback
+        if (!isPlayingRef.current) {
+          playNext()
         }
-
-        audio.onended = cleanup
-        audio.onerror = cleanup
-
-        try { await audio.play() }
-        catch { cleanup() }
       },
 
       onClose: () => {
@@ -125,7 +180,7 @@ export default function useVoiceChat() {
         if (statusRef.current !== 'idle') updateStatus('idle')
       },
     })
-  }, [ws, vad, stopAudio, startProcessingTimeout, clearProcessingTimeout])
+  }, [ws, vad, playNext, startProcessingTimeout, clearProcessingTimeout])
 
   /* ── Start / End conversation ── */
 
@@ -158,6 +213,9 @@ export default function useVoiceChat() {
   const endConversation = useCallback(() => {
     clearProcessingTimeout()
     stopAudio()
+    idleReceivedRef.current = false
+    streamingTextRef.current = ""
+    aiMessageIdRef.current = null
     vad.stop()
     ws.disconnect()
     updateStatus('idle')

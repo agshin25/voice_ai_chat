@@ -6,8 +6,8 @@ import os
 import asyncio
 
 from services.stt import transcribe
-from services.llm import get_response
-from services.tts import text_to_speech
+from services.llm import get_response, get_response_stream_async
+from services.tts import text_to_speech, text_to_speech_bytes
 
 app = FastAPI()
 
@@ -44,25 +44,28 @@ async def websocket_chat(websocket: WebSocket):
                     "user_text": user_text
                 })
 
-                ai_text = await asyncio.to_thread(get_response, user_text, ws_history)
+                # Stream LLM sentences → TTS → send each chunk immediately
+                full_text = ""
+                async for sentence in get_response_stream_async(user_text, ws_history):
+                    full_text += (" " if full_text else "") + sentence
+
+                    # Send text chunk so frontend can display incrementally
+                    await websocket.send_json({
+                        "status": "ai_chunk",
+                        "text": sentence
+                    })
+
+                    # Generate TTS for this sentence and send audio
+                    audio_bytes = await text_to_speech_bytes(sentence)
+                    await websocket.send_bytes(audio_bytes)
 
                 ws_history.append({"role": "user", "content": user_text})
-                ws_history.append({"role": "assistant", "content": ai_text})
+                ws_history.append({"role": "assistant", "content": full_text})
 
                 await websocket.send_json({
                     "status": "speaking",
-                    "ai_text": ai_text
+                    "ai_text": full_text
                 })
-
-                temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-                temp_output.close()
-                await text_to_speech(ai_text, temp_output.name)
-
-                with open(temp_output.name, "rb") as f:
-                    audio_bytes = f.read()
-                os.unlink(temp_output.name)
-
-                await websocket.send_bytes(audio_bytes)
 
                 await websocket.send_json({"status": "idle"})
             except Exception as e:
