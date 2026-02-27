@@ -15,7 +15,10 @@ export default function useVoiceChat() {
   const ws = useWebSocket()
   const vad = useVAD()
 
-  useEffect(() => { statusRef.current = status }, [status])
+  const updateStatus = useCallback((s) => {
+    statusRef.current = s
+    setStatus(s)
+  }, [])
 
   useEffect(() => {
     if (!error) return
@@ -37,7 +40,7 @@ export default function useVoiceChat() {
     timeoutRef.current = setTimeout(() => {
       if (statusRef.current === 'processing') {
         console.warn('Processing timeout — resuming listening')
-        setStatus('listening')
+        updateStatus('listening')
         vad.resume()
       }
     }, 15000)
@@ -57,7 +60,7 @@ export default function useVoiceChat() {
       onJson: (data) => {
         switch (data.status) {
           case 'transcribing':
-            setStatus('processing')
+            updateStatus('processing')
             startProcessingTimeout()
             break
 
@@ -83,7 +86,7 @@ export default function useVoiceChat() {
           case 'idle':
             clearProcessingTimeout()
             if (statusRef.current !== 'playing') {
-              setStatus('listening')
+              updateStatus('listening')
               vad.resume()
             }
             break
@@ -93,7 +96,7 @@ export default function useVoiceChat() {
       onBinary: async (data) => {
         clearProcessingTimeout()
         vad.pause()
-        setStatus('playing')
+        updateStatus('playing')
 
         const url = createAudioURL(data)
         const audio = new Audio(url)
@@ -104,7 +107,7 @@ export default function useVoiceChat() {
           if (audioRef.current === audio) {
             audioRef.current = null
             if (statusRef.current !== 'idle') {
-              setStatus('listening')
+              updateStatus('listening')
               vad.resume()
             }
           }
@@ -119,7 +122,7 @@ export default function useVoiceChat() {
 
       onClose: () => {
         clearProcessingTimeout()
-        if (statusRef.current !== 'idle') setStatus('idle')
+        if (statusRef.current !== 'idle') updateStatus('idle')
       },
     })
   }, [ws, vad, stopAudio, startProcessingTimeout, clearProcessingTimeout])
@@ -134,21 +137,21 @@ export default function useVoiceChat() {
 
       await vad.start({
         onSpeechStart: () => {
-          setStatus('recording')
+          updateStatus('recording')
         },
         onSpeechEnd: (audio) => {
           vad.pause()
-          setStatus('processing')
+          updateStatus('processing')
           const wav = encodeWAV(audio)
           wav.arrayBuffer().then((buf) => ws.sendBinary(buf))
         },
       })
 
-      setStatus('listening')
+      updateStatus('listening')
     } catch (err) {
       console.error('Failed to start conversation:', err)
       setError('Could not start — check microphone permissions.')
-      setStatus('idle')
+      updateStatus('idle')
     }
   }, [ws, vad, setupWSHandlers, stopAudio])
 
@@ -157,7 +160,7 @@ export default function useVoiceChat() {
     stopAudio()
     vad.stop()
     ws.disconnect()
-    setStatus('idle')
+    updateStatus('idle')
   }, [ws, vad, stopAudio, clearProcessingTimeout])
 
   const toggle = useCallback(() => {
