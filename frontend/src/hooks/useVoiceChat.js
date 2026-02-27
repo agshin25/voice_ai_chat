@@ -137,6 +137,7 @@ export default function useVoiceChat() {
           setStatus('recording')
         },
         onSpeechEnd: (audio) => {
+          vad.pause()
           setStatus('processing')
           const wav = encodeWAV(audio)
           wav.arrayBuffer().then((buf) => ws.sendBinary(buf))
