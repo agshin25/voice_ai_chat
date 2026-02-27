@@ -40,7 +40,7 @@ export default function useVoiceChat() {
         setStatus('listening')
         vad.resume()
       }
-    }, 30000)
+    }, 15000)
   }, [clearProcessingTimeout, vad])
 
   const stopAudio = useCallback(() => {
