@@ -36,12 +36,18 @@ export default function useWebSocket() {
     }
   }, [])
 
+  const sendText = useCallback((text) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(text)
+    }
+  }, [])
+
   const setHandlers = useCallback((h) => {
     handlersRef.current = h
   }, [])
 
   return useMemo(
-    () => ({ connect, disconnect, sendBinary, setHandlers }),
-    [connect, disconnect, sendBinary, setHandlers]
+    () => ({ connect, disconnect, sendBinary, sendText, setHandlers }),
+    [connect, disconnect, sendBinary, sendText, setHandlers]
   )
 }
