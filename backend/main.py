@@ -95,7 +95,7 @@ async def websocket_cargo(websocket: WebSocket):
         while True:
             data = await websocket.receive()
 
-            if "bytes" in data:
+            if data.get("bytes"):
                 transcript = await asyncio.to_thread(transcribe, save_audio(data["bytes"]))
             else:
                 transcript = data["text"]
