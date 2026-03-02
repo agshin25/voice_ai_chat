@@ -166,7 +166,7 @@ export default function useCargoChat() {
   /* ── Voice ── */
 
   const toggleVoice = useCallback(async () => {
-    if (statusRef.current !== 'idle') {
+    if (isVoiceModeRef.current) {
       disconnect()
       return
     }
@@ -174,8 +174,12 @@ export default function useCargoChat() {
     try {
       await connect()
       await vad.start({
-        onSpeechStart: () => updateStatus('recording'),
+        onSpeechStart: () => {
+          console.log('[cargo] speech start')
+          updateStatus('recording')
+        },
         onSpeechEnd: (audio) => {
+          console.log('[cargo] speech end')
           vad.pause()
           updateStatus('processing')
           const wav = encodeWAV(audio)
@@ -184,7 +188,9 @@ export default function useCargoChat() {
       })
       isVoiceModeRef.current = true
       updateStatus('listening')
-    } catch {
+      console.log('[cargo] VAD started, listening')
+    } catch (err) {
+      console.error('[cargo] VAD start failed:', err)
       setError('Could not access microphone.')
       updateStatus('idle')
     }
