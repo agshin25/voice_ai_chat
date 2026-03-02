@@ -11,7 +11,6 @@ def transcribe(audio_path: str) -> str:
         transcription = client.audio.transcriptions.create(
             file=("audio.wav", audio_file),
             model="whisper-large-v3",
-            language="az",
             prompt="Salam, necəsən? Mənə Azərbaycan haqqında məlumat ver. Yaxşıyam, sağ ol.",
         )
     return transcription.text.strip()
