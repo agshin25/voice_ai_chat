@@ -15,6 +15,7 @@ export default function useCargoChat() {
   const streamingTextRef = useRef('')
   const aiMessageIdRef   = useRef(null)
   const statusRef        = useRef('idle')
+  const isVoiceModeRef   = useRef(false)
 
   const ws  = useWebSocket()
   const vad = useVAD()
@@ -37,7 +38,12 @@ export default function useCargoChat() {
     if (queue.length === 0) {
       isPlayingRef.current = false
       if (idleReceivedRef.current) {
-        updateStatus('idle')
+        if (isVoiceModeRef.current) {
+          updateStatus('listening')
+          vad.resume()
+        } else {
+          updateStatus('idle')
+        }
       }
       return
     }
@@ -57,7 +63,7 @@ export default function useCargoChat() {
     audio.onended = onDone
     audio.onerror = onDone
     audio.play().catch(onDone)
-  }, [updateStatus])
+  }, [vad, updateStatus])
 
   const stopAudio = useCallback(() => {
     audioQueueRef.current = []
@@ -112,12 +118,20 @@ export default function useCargoChat() {
 
           case 'idle':
             idleReceivedRef.current = true
-            if (!isPlayingRef.current) updateStatus('idle')
+            if (!isPlayingRef.current) {
+              if (isVoiceModeRef.current) {
+                updateStatus('listening')
+                vad.resume()
+              } else {
+                updateStatus('idle')
+              }
+            }
             break
         }
       },
 
       onBinary: (data) => {
+        vad.pause()
         updateStatus('playing')
         audioQueueRef.current.push(data)
         if (!isPlayingRef.current) playNext()
@@ -127,7 +141,7 @@ export default function useCargoChat() {
         if (statusRef.current !== 'idle') updateStatus('idle')
       },
     })
-  }, [ws, playNext, updateStatus])
+  }, [ws, vad, playNext, updateStatus])
 
   /* ── Connect / Disconnect ── */
 
@@ -142,6 +156,7 @@ export default function useCargoChat() {
   }, [ws, setupWSHandlers])
 
   const disconnect = useCallback(() => {
+    isVoiceModeRef.current = false
     stopAudio()
     vad.stop()
     ws.disconnect()
@@ -167,6 +182,7 @@ export default function useCargoChat() {
           wav.arrayBuffer().then((buf) => ws.sendBinary(buf))
         },
       })
+      isVoiceModeRef.current = true
       updateStatus('listening')
     } catch {
       setError('Could not access microphone.')
