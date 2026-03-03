@@ -49,7 +49,7 @@ export default function Sidebar({ activePage, onNavigate }) {
         {!open && (
           <button
             onClick={() => setOpen(true)}
-            className="fixed top-3.5 left-4 z-40 w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+            className="fixed top-[12px] left-4 z-40 w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />

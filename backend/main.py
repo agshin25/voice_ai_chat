@@ -9,7 +9,7 @@ from services.stt import transcribe
 from services.llm import get_response, get_response_stream_async
 from services.tts import text_to_speech, text_to_speech_bytes
 from services.cargo import get_cargo
-from services.llm import get_cargo_response_stream_async, extract_tracking_number
+from services.llm import get_cargo_response_stream_async, extract_tracking_number, get_no_tracking_response, detect_language
 from services.utils import save_audio
 
 app = FastAPI()
@@ -50,14 +50,12 @@ async def websocket_chat(websocket: WebSocket):
                 async for sentence in get_response_stream_async(user_text, ws_history):
                     full_text += (" " if full_text else "") + sentence
 
-                    # Send text chunk so frontend can display incrementally
+                    # Generate TTS first, then send text + audio together (no gap)
+                    audio_bytes = await text_to_speech_bytes(sentence)
                     await websocket.send_json({
                         "status": "ai_chunk",
                         "text": sentence
                     })
-
-                    # Generate TTS for this sentence and send audio
-                    audio_bytes = await text_to_speech_bytes(sentence)
                     await websocket.send_bytes(audio_bytes)
 
                 ws_history.append({"role": "user", "content": user_text})
@@ -90,6 +88,8 @@ async def websocket_chat(websocket: WebSocket):
 @app.websocket("/api/ws/cargo")
 async def websocket_cargo(websocket: WebSocket):
     await websocket.accept()
+    cargo_history = []
+    user_lang = None
 
     try:
         while True:
@@ -99,14 +99,25 @@ async def websocket_cargo(websocket: WebSocket):
                 transcript = await asyncio.to_thread(transcribe, save_audio(data["bytes"]))
             else:
                 transcript = data["text"]
-            
+
+            cargo_history.append(transcript)
+
+            has_letters_only = all(c.isalpha() or c.isspace() for c in transcript)
+            has_words = has_letters_only and len(transcript.strip()) > 0
+            if has_words:
+                user_lang = await detect_language(transcript)
+                print(f"[cargo] Detected language: {user_lang}")
+            elif user_lang is None:
+                user_lang = "Azerbaijani"
+
             await websocket.send_json({"status": "thinking", "user_text": transcript})
 
             tracking_number = await extract_tracking_number(transcript)
 
             if not tracking_number:
-                await websocket.send_json({"status": "ai_chunk", "text": "Please provide your tracking number."})
-                audio_bytes = await text_to_speech_bytes("Please provide your tracking number.")
+                no_track_msg = await get_no_tracking_response(cargo_history, user_lang)
+                audio_bytes = await text_to_speech_bytes(no_track_msg)
+                await websocket.send_json({"status": "ai_chunk", "text": no_track_msg})
                 await websocket.send_bytes(audio_bytes)
                 await websocket.send_json({"status": "idle"})
                 continue
@@ -114,10 +125,10 @@ async def websocket_cargo(websocket: WebSocket):
             cargo_data = get_cargo(tracking_number)
 
             full_text = ""
-            async for sentence in get_cargo_response_stream_async(transcript, cargo_data):
+            async for sentence in get_cargo_response_stream_async(cargo_history, cargo_data, user_lang):
                 full_text += (" " if full_text else "") + sentence
-                await websocket.send_json({"status": "ai_chunk", "text": sentence})
                 audio_bytes = await text_to_speech_bytes(sentence)
+                await websocket.send_json({"status": "ai_chunk", "text": sentence})
                 await websocket.send_bytes(audio_bytes)
 
             await websocket.send_json({"status": "idle"})

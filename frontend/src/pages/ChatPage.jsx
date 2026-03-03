@@ -41,7 +41,7 @@ export default function ChatPage() {
 
       {/* Page header */}
       <div className="flex items-center gap-2.5 px-6 py-4 border-b border-white/[0.04] shrink-0">
-        <div className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+        <div className={`w-2 h-2 rounded-full shrink-0 transition-colors duration-500 md:ml-0 ml-8 ${
           status === 'idle'
             ? 'bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)]'
             : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'

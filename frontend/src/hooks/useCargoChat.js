@@ -201,7 +201,9 @@ export default function useCargoChat() {
   const sendText = useCallback(async (text) => {
     if (!text.trim()) return
 
-    if (statusRef.current === 'idle') await connect()
+    if (!ws.isConnected()) {
+      await connect()
+    }
 
     updateStatus('processing')
     ws.sendText(text)
